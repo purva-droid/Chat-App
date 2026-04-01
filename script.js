@@ -15,11 +15,15 @@ socket.on('user-connected', name =>{
     appendMessage(`${name} connected`)
 })
 
+socket.on('user-disconnected', name =>{
+    appendMessage(`${name} disconnected`)
+})
 
 
 messageForm.addEventListener('submit', e =>{
     e.preventDefault()
     const message = messageInput.value
+    appendMessage(`You: ${message}`)
     socket.emit('send-chat-message', message) //to send the message to the server when the form is submitted from the client side
     messageInput.value = '' //to clear the input field after sending the message
 }) //to prevent the page from refreshing when the form is submitted 

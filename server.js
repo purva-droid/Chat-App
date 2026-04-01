@@ -17,4 +17,9 @@ io.on('connection', socket => {
         socket.broadcast.emit('chat-message', {message : message, name: 
             users[socket.id]}  ) //to send the message to all the other clients except the sender
     })
+     socket.on('disconnect', () => {
+        socket.broadcast.emit('user-disconnected',users[socket.id]) //to send the message to all the other clients except the sender
+        delete users[socket.id]
+        
+    })
 })  
