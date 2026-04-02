@@ -1,9 +1,25 @@
-const io = require('socket.io')(3000, {
+const express = require('express');
+const http = require('http');
+const path = require('path');
+
+const app = express();
+const server = http.createServer(app);
+const port = process.env.PORT || 3000;
+
+app.use(express.static(path.join(__dirname)));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+const io = require('socket.io')(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"]
   }
 })
+
+console.log(`Server running on port ${port}`)
 
 const users = {}
 const rooms = { 'general': {} }
@@ -99,3 +115,5 @@ io.on('connection', socket => {
         }
     })
 })
+
+server.listen(port, () => {});
