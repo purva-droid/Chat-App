@@ -19,8 +19,6 @@ const io = require('socket.io')(server, {
   }
 })
 
-console.log(`Server running on port ${port}`)
-
 const users = {}
 const rooms = { 'general': {} }
 
@@ -115,5 +113,4 @@ io.on('connection', socket => {
         }
     })
 })
-
 server.listen(port, () => {});
