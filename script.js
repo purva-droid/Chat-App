@@ -1,4 +1,9 @@
-const socket = io()
+let socket
+try {
+  socket = io(window.location.protocol + '//' + window.location.hostname + (window.location.port ? ':' + window.location.port : ''))
+} catch(e) {
+  socket = io('https://chat-app-server-wf2d.onrender.com')
+}
 const messageForm = document.getElementById('send-container')
 const messageInput = document.getElementById('message-input')
 const messageContainer = document.getElementById('message-container')
@@ -12,7 +17,6 @@ const replyText = document.getElementById('reply-text')
 const replyCancel = document.getElementById('reply-cancel')
 const createRoomBtn = document.getElementById('create-room-btn')
 
-let audioCtx = null
 const typingUsers = new Set()
 let typingTimeout = null
 let replyTo = null
@@ -34,30 +38,135 @@ function getAvatarColor(name) {
 }
 
 function playNotification() {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-    if (audioCtx.state === 'suspended') audioCtx.resume()
-    const osc = audioCtx.createOscillator()
-    const gain = audioCtx.createGain()
-    osc.connect(gain)
-    gain.connect(audioCtx.destination)
-    osc.type = 'sine'
-    osc.frequency.setValueAtTime(880, audioCtx.currentTime)
-    osc.frequency.setValueAtTime(1100, audioCtx.currentTime + 0.08)
-    gain.gain.setValueAtTime(0.15, audioCtx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25)
-    osc.start(audioCtx.currentTime)
-    osc.stop(audioCtx.currentTime + 0.25)
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)()
+        if (ctx.state === 'suspended') ctx.resume()
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(880, ctx.currentTime)
+        osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1)
+        gain.gain.setValueAtTime(0.3, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.3)
+    } catch(e) { console.log('audio error', e) }
 }
 
-// Username persistence
+function playConnectSound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)()
+        if (ctx.state === 'suspended') ctx.resume()
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(523, ctx.currentTime)
+        osc.frequency.setValueAtTime(659, ctx.currentTime + 0.15)
+        gain.gain.setValueAtTime(0.3, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.3)
+    } catch(e) { console.log('audio error', e) }
+}
+
+function playSendSound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)()
+        if (ctx.state === 'suspended') ctx.resume()
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(700, ctx.currentTime)
+        osc.frequency.setValueAtTime(500, ctx.currentTime + 0.08)
+        gain.gain.setValueAtTime(0.2, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.15)
+    } catch(e) { console.log('audio error', e) }
+}
+
 const savedName = localStorage.getItem('chat-username')
 let name = prompt('What is your name?', savedName || '')
 if (!name || !name.trim()) name = 'Anonymous'
 localStorage.setItem('chat-username', name)
 appendMessage('You joined', 'system')
-socket.emit('new-user', name)
 
-// Theme toggle
+// Demo mode for GitHub Pages - works fully client-side when server is unavailable
+let demoMode = false
+socket.on('connect', () => {
+  socket.emit('new-user', name)
+})
+
+socket.on('connect_error', () => {
+  if (!demoMode) {
+    demoMode = true
+    appendMessage('Running in Demo Mode (client-side only)', 'system')
+    
+    // Mock user list
+    const mockUsers = [
+      { name: 'Alice', initial: 'A' },
+      { name: 'Bob', initial: 'B' },
+      { name: name, initial: name.charAt(0).toUpperCase() }
+    ]
+    userListEl.innerHTML = ''
+    mockUsers.forEach(u => {
+      const li = document.createElement('li')
+      li.className = 'user-item'
+      const avatar = document.createElement('span')
+      avatar.className = 'user-avatar-small'
+      avatar.style.backgroundColor = getAvatarColor(u.name)
+      avatar.textContent = u.initial
+      const nameSpan = document.createElement('span')
+      nameSpan.textContent = u.name
+      li.appendChild(avatar)
+      li.appendChild(nameSpan)
+      userListEl.appendChild(li)
+    })
+    
+    // Mock room list
+    const mockRooms = ['general', 'random', 'gaming']
+    roomListEl.innerHTML = ''
+    mockRooms.forEach(room => {
+      const li = document.createElement('li')
+      li.className = room === currentRoom ? 'room-item active' : 'room-item'
+      li.textContent = `# ${room}`
+      li.addEventListener('click', () => {
+        if (room !== currentRoom) {
+          currentRoom = room
+          currentRoomEl.textContent = `# ${room}`
+          messageContainer.innerHTML = ''
+          appendMessage(`Joined #${room}`, 'system')
+          document.querySelectorAll('.room-item').forEach(el => {
+            el.classList.toggle('active', el.textContent === `# ${room}`)
+          })
+        }
+      })
+      roomListEl.appendChild(li)
+    })
+
+    // Simulate other users
+    setTimeout(() => appendMessage('Alice: Hello there! 👋', 'other', new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 'demo-1'), 1000)
+    setTimeout(() => appendMessage('Bob: Hey everyone! Welcome to the chat app', 'other', new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 'demo-2'), 2500)
+    setTimeout(() => appendMessage('Alice: This is the live demo version running completely client-side', 'other', new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 'demo-3'), 4000)
+    setTimeout(() => typingUsers.add('Alice'), 5500)
+    setTimeout(() => updateTypingIndicator(), 5500)
+    setTimeout(() => appendMessage('Alice: You can send messages, reply, react - everything works!', 'other', new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 'demo-4'), 7000)
+    setTimeout(() => { typingUsers.delete('Alice'); updateTypingIndicator() }, 7000)
+  }
+})
+
+if (!socket.connected) {
+  setTimeout(() => {
+    if (!socket.connected) socket.io.onError({})
+  }, 3000)
+}
+
 const savedTheme = localStorage.getItem('chat-theme') || 'dark'
 document.body.setAttribute('data-theme', savedTheme)
 themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙'
@@ -70,13 +179,11 @@ themeToggle.addEventListener('click', () => {
     themeToggle.textContent = next === 'dark' ? '☀️' : '🌙'
 })
 
-// Reply
 replyCancel.addEventListener('click', () => {
     replyTo = null
     replyPreview.style.display = 'none'
 })
 
-// Room creation
 createRoomBtn.addEventListener('click', () => {
     const room = prompt('Room name:')
     if (room && room.trim()) {
@@ -84,11 +191,6 @@ createRoomBtn.addEventListener('click', () => {
         socket.emit('join-room', room.trim().toLowerCase())
     }
 })
-
-// Typing
-messageInput.addEventListener('focus', () => {
-    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume()
-}, { once: true })
 
 messageInput.addEventListener('input', () => {
     socket.emit('typing')
@@ -98,7 +200,6 @@ messageInput.addEventListener('input', () => {
     }, 1500)
 })
 
-// Socket events
 socket.on('user-typing', userName => {
     typingUsers.add(userName)
     updateTypingIndicator()
@@ -116,10 +217,12 @@ socket.on('chat-message', data => {
 
 socket.on('user-connected', name => {
     appendMessage(`${name} connected`, 'system')
+    playConnectSound()
 })
 
 socket.on('user-disconnected', name => {
     appendMessage(`${name} disconnected`, 'system')
+    playConnectSound()
 })
 
 socket.on('user-list', users => {
@@ -191,7 +294,6 @@ socket.on('message-reaction', data => {
     }
 })
 
-// Form submit
 messageForm.addEventListener('submit', e => {
     e.preventDefault()
     const message = messageInput.value
@@ -201,6 +303,7 @@ messageForm.addEventListener('submit', e => {
     appendMessage(`You: ${message}`, 'self', time, id, replyTo)
     socket.emit('send-chat-message', { id, message, replyTo })
     socket.emit('stop-typing')
+    playSendSound()
     messageInput.value = ''
     replyTo = null
     replyPreview.style.display = 'none'
