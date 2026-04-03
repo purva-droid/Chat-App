@@ -1,7 +1,7 @@
 let socket
-try {
-  socket = io(window.location.protocol + '//' + window.location.hostname + (window.location.port ? ':' + window.location.port : ''))
-} catch(e) {
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  socket = io()
+} else {
   socket = io('https://chat-app-server-wf2d.onrender.com')
 }
 const messageForm = document.getElementById('send-container')
